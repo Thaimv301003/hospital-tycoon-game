@@ -1,9 +1,10 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem; // Thêm thư viện Input System mới
+using UnityEngine.InputSystem; 
+using UnityEngine.InputSystem.Controls;
 
 /// <summary>
-/// Quản lý di chuyển Camera quanh Map (Dùng New Input System)
+/// Quản lý di chuyển Camera quanh Map (Hỗ trợ PC & Android Touch với New Input System)
 /// </summary>
 public class CameraController : MonoBehaviour
 {
@@ -17,11 +18,11 @@ public class CameraController : MonoBehaviour
     [Tooltip("Chặn không cho kéo quá xa về 2 mặt trên/dưới")]
     public Vector2 limitZ = new Vector2(-50f, 50f);
 
-    [Header("Zoom Settings (Cuộn chuột)")]
+    [Header("Zoom Settings (Cuộn chuột & Pinch to zoom)")]
     public float zoomSpeed = 2f;
-    [Tooltip("Độ thu nhỏ ngần màn hình nhất")]
+    [Tooltip("Độ thu nhỏ ngần màn hình nhất (Hoặc độ cao tối thiểu cho 3D)")]
     public float minZoom = 5f;
-    [Tooltip("Độ phóng to xa màn hình nhất")]
+    [Tooltip("Độ phóng to xa màn hình nhất (Hoặc độ cao tối đa cho 3D)")]
     public float maxZoom = 40f;
 
     private Camera cam;
@@ -42,31 +43,53 @@ public class CameraController : MonoBehaviour
         HandlePan();
         
         // Di chuyển camera mượt mà từ từ đuổi theo targetPosition
-        // Lưu ý: CHỈ Lerp bắt mượt khi đang KHÔNG kéo chuột để tránh rung lắc
-        if (Mouse.current == null || !Mouse.current.leftButton.isPressed)
+        // Chỉ Lerp bắt mượt khi đang KHÔNG kéo tay/chuột để tránh rung lắc
+        if (!IsPointerPressed())
         {
             transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * smoothSpeed);
         }
     }
 
+    private bool IsPointerPressed()
+    {
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed) return true;
+        if (Mouse.current != null && Mouse.current.leftButton.isPressed) return true;
+        return false;
+    }
+
     private void HandlePan()
     {
-        if (Mouse.current == null) return;
+        bool isPressed = false;
+        bool wasPressed = false;
+        int touchCount = GetActiveTouchCount();
 
-        // Khi vừa bắt đầu ấn chuột trái
-        if (Mouse.current.leftButton.wasPressedThisFrame)
+        // Chỉ cho phép Pan khi có đúng 1 ngón tay chạm màn hình (tránh xung đột với Zoom bằng 2 ngón)
+        if (Touchscreen.current != null && touchCount > 0)
         {
-            // Bỏ qua nếu người dùng đang click vào một cục UI (ví dụ Nút bấm)
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                return;
-
-            dragOrigin = GetMouseGroundPosition();
+            if (touchCount == 1)
+            {
+                isPressed = Touchscreen.current.primaryTouch.press.isPressed;
+                wasPressed = Touchscreen.current.primaryTouch.press.wasPressedThisFrame;
+            }
+        }
+        else if (Mouse.current != null)
+        {
+            isPressed = Mouse.current.leftButton.isPressed;
+            wasPressed = Mouse.current.leftButton.wasPressedThisFrame;
         }
 
-        // Khi đang giữ đè chuột trái và rê
-        if (Mouse.current.leftButton.isPressed)
+        if (wasPressed)
         {
-            Vector3 currentPos = GetMouseGroundPosition();
+            // Bỏ qua nếu click / chạm vào UI
+            if (IsPointerOverUI())
+                return;
+
+            dragOrigin = GetPointerGroundPosition();
+        }
+
+        if (isPressed)
+        {
+            Vector3 currentPos = GetPointerGroundPosition();
             if (currentPos != Vector3.zero && dragOrigin != Vector3.zero)
             {
                 // Tính độ chênh lệch bị dịch chuyển
@@ -79,65 +102,103 @@ public class CameraController : MonoBehaviour
                 targetPosition.x = Mathf.Clamp(targetPosition.x, limitX.x, limitX.y);
                 targetPosition.z = Mathf.Clamp(targetPosition.z, limitZ.x, limitZ.y);
 
-                // QUAN TRỌNG: Snap (Khóa nhòe) khung hình ngay sang vị trí đích để dứt điểm sự cố RUNG GIẬT,
-                // do tia bắt nền đập lại độ trễ Lerp của camera gây ra
+                // Quan trọng: Tách biệt transform.position ra để mượt mà khi nhả chuột (Lerp ở LateUpdate sẽ lo)
+                // Phản hồi lập tức trên màn hình cảm ứng để người dùng có cảm giác dính tay 1:1
                 transform.position = targetPosition;
             }
         }
         else
         {
-            // Reset khi nhả chuột
+            // Reset khi nhả ngón tay / chuột
             dragOrigin = Vector3.zero;
         }
     }
 
     private void HandleZoom()
     {
-        if (Mouse.current == null) return;
+        int touchCount = GetActiveTouchCount();
 
-        // Đọc giá trị cuộn chuột thô (raw)
-        float rawScroll = Mouse.current.scroll.ReadValue().y;
-        
-        if (Mathf.Abs(rawScroll) > 0.01f)
+        // 1. Phóng to / Thu nhỏ bằng 2 ngón tay (Pinch to zoom) trên điện thoại
+        if (Touchscreen.current != null && touchCount >= 2)
         {
-            // Chặn cuộn lố nếu đang cuộn qua UI to
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                return;
+            // Cần lấy đủ 2 touch đang active
+            var touch0 = GetActiveTouch(0);
+            var touch1 = GetActiveTouch(1);
 
-            // Chuyển đổi giá trị scroll của hệ thống mới (thường là 120, -120, v.v) về tương đương Legacy Input (0.1, -0.1)
-            float scroll = Mathf.Clamp(rawScroll, -1f, 1f) * 0.1f;
-
-            if (cam.orthographic)
+            if (touch0 != null && touch1 != null)
             {
-                // Cho game 2D cơ bản hoặc gắn Camera mode Orthographic
-                cam.orthographicSize -= scroll * zoomSpeed * 10f;
-                cam.orthographicSize = Mathf.Clamp(cam.orthographicSize, minZoom, maxZoom);
+                // Vị trí frame này
+                Vector2 pos0 = touch0.position.ReadValue();
+                Vector2 pos1 = touch1.position.ReadValue();
+
+                // Vị trí frame trước (Bằng vị trí hiện tại trừ đi độ dịch chuyển delta của 1 frame)
+                Vector2 prevPos0 = pos0 - touch0.delta.ReadValue();
+                Vector2 prevPos1 = pos1 - touch1.delta.ReadValue();
+
+                // Khoảng cách giữa 2 ngón tay ở frame trước và frame này
+                float prevMagnitude = (prevPos0 - prevPos1).magnitude;
+                float currentMagnitude = (pos0 - pos1).magnitude;
+
+                // Độ chênh lệch (âm là thu nhỏ, dương là phóng to)
+                float difference = currentMagnitude - prevMagnitude;
+
+                // Ở màn hình cảm ứng, scale difference cho cảm giác vuốt tự nhiên (0.01 đến 0.05 tuỳ taste)
+                ApplyZoom(difference * 0.05f);
             }
-            else
+        }
+        // 2. Phóng to / Thu nhỏ bằng cuộn chuột trên PC
+        else if (Mouse.current != null)
+        {
+            float rawScroll = Mouse.current.scroll.ReadValue().y;
+            if (Mathf.Abs(rawScroll) > 0.01f)
             {
-                // Cho game 3D Perspective (Phóng theo trục nhìn tới - forward)
-                targetPosition += transform.forward * scroll * zoomSpeed * 15f;
-                
-                // Khóa độ cao zoom tránh lún đất hay bay lên mây (so tương đối qua trục Y)
-                targetPosition.y = Mathf.Clamp(targetPosition.y, minZoom, maxZoom);
+                if (IsPointerOverUI()) return;
+
+                float scroll = Mathf.Clamp(rawScroll, -1f, 1f) * 0.1f;
+                ApplyZoom(scroll);
             }
         }
     }
 
-    /// <summary>
-    /// Thuật toán bắn tia thẳng từ ống kính xuống "sàn vô hình" để tìm điểm neo kéo chuột
-    /// (Rất kinh điển dùng trong game Tycoon/MOBA)
-    /// </summary>
-    private Vector3 GetMouseGroundPosition()
+    private void ApplyZoom(float scrollAmount)
     {
-        if (cam == null || Mouse.current == null) return Vector3.zero;
+        if (cam.orthographic)
+        {
+            cam.orthographicSize -= scrollAmount * zoomSpeed * 10f;
+            cam.orthographicSize = Mathf.Clamp(cam.orthographicSize, minZoom, maxZoom);
+        }
+        else
+        {
+            targetPosition += transform.forward * scrollAmount * zoomSpeed * 15f;
+            targetPosition.y = Mathf.Clamp(targetPosition.y, minZoom, maxZoom);
+            transform.position = targetPosition; // Cập nhật luôn tránh lag do Lerp
+        }
+    }
 
-        // Tạo 1 mặt sàn ngửa (Up) nằm tại điểm cao độ Y = 0 (zero)
+    /// <summary>
+    /// Bắn tia tìm điểm neo (Ground) trên màn hình tại ngón tay hoặc chuột
+    /// </summary>
+    private Vector3 GetPointerGroundPosition()
+    {
+        if (cam == null) return Vector3.zero;
+
+        Vector2 screenPos = Vector2.zero;
+
+        if (Touchscreen.current != null && GetActiveTouchCount() > 0)
+        {
+            screenPos = Touchscreen.current.primaryTouch.position.ReadValue();
+        }
+        else if (Mouse.current != null)
+        {
+            screenPos = Mouse.current.position.ReadValue();
+        }
+        else
+        {
+            return Vector3.zero;
+        }
+
         Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
-        
-        // Lấy toạ độ chuột màn hình từ New Input System
-        Vector2 mousePos = Mouse.current.position.ReadValue();
-        Ray ray = cam.ScreenPointToRay(mousePos);
+        Ray ray = cam.ScreenPointToRay(screenPos);
 
         if (groundPlane.Raycast(ray, out float hitDistance))
         {
@@ -145,5 +206,59 @@ public class CameraController : MonoBehaviour
         }
 
         return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Đếm số lượng ngón tay đang chạm
+    /// </summary>
+    private int GetActiveTouchCount()
+    {
+        if (Touchscreen.current == null) return 0;
+        int count = 0;
+        foreach (var touch in Touchscreen.current.touches)
+        {
+            if (touch.press.isPressed) count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Lấy ngón tay đang chạm theo thứ tự index (0 = ngón đầu, 1 = ngón thứ hai)
+    /// </summary>
+    private TouchControl GetActiveTouch(int index)
+    {
+        if (Touchscreen.current == null) return null;
+        int currentIdx = 0;
+        foreach (var touch in Touchscreen.current.touches)
+        {
+            if (touch.press.isPressed)
+            {
+                if (currentIdx == index) return touch;
+                currentIdx++;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Kiểm tra xem ngón tay/chuột có đang ấn lên UI (nút, panel...)
+    /// </summary>
+    private bool IsPointerOverUI()
+    {
+        if (EventSystem.current == null) return false;
+
+        // Xử lý kiểm tra cho cảm ứng Touch
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+        {
+            int touchId = Touchscreen.current.primaryTouch.touchId.ReadValue();
+            if (EventSystem.current.IsPointerOverGameObject(touchId))
+                return true;
+        }
+        
+        // Xử lý kiểm tra cho chuột
+        if (EventSystem.current.IsPointerOverGameObject())
+            return true;
+
+        return false;
     }
 }

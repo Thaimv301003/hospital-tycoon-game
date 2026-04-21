@@ -22,6 +22,10 @@ public class RoomUpgradeManager : MonoBehaviour
     [Tooltip("Điểm neo (vị trí thế giới) để đặt UI đè lên (vd: 1 object trống nằm giữa phòng)")]
     public Transform uiSpawnPosition;
 
+    [Header("References")]
+    [Tooltip("Kéo RoomController vào đây để liên kết dữ liệu với Bác Sĩ khi mở bảng chung")]
+    public RoomController roomController;
+
     private GameObject uiInstance;
     private RectTransform uiRectTransform;
 
@@ -82,29 +86,39 @@ public class RoomUpgradeManager : MonoBehaviour
     {
         if (uiPrefab != null && mainCanvasTransform != null)
         {
-            // Sinh ra cục UI trong Canvas chính
+            // Sinh ra cục UI FloatingUpgradeMenu trong Canvas chính
             uiInstance = Instantiate(uiPrefab, mainCanvasTransform);
-            uiInstance.name = "UI_Upgrade_" + roomName; // Đổi tên cho dễ nhìn trong Hierarchy
+            uiInstance.name = "UI_Upgrade_" + roomName;
             uiRectTransform = uiInstance.GetComponent<RectTransform>();
 
-            // Gắn tự động sự kiện OnClick cho Button
-            // Tìm component Button ở ngay gốc mặt ngoài hoặc ẩn trong con cháu
-            Button btn = uiInstance.GetComponent<Button>();
-            if (btn == null) btn = uiInstance.GetComponentInChildren<Button>(true);
-
-            if (btn != null)
+            // Thử link với FloatingUpgradeMenu (thiết kế mới)
+            FloatingUpgradeMenu floatingMenu = uiInstance.GetComponent<FloatingUpgradeMenu>();
+            if (floatingMenu != null)
             {
-                btn.onClick.RemoveAllListeners(); // Xoá sạch rác sự kiện cũ nhỡ có gắn bừa
-                btn.onClick.AddListener(OnUpgradeButtonClicked);
-                Debug.Log($"[{roomName}] Đã tự động gắn event Click thành công vào nút UI.");
+                // Lấy DoctorUpgradeManager từ RoomController nếu có
+                DoctorUpgradeManager docManager = null;
+                if (roomController != null && roomController.doctor != null)
+                    docManager = roomController.doctor.upgradeManager;
+
+                floatingMenu.Initialize(this, docManager);
+                Debug.Log($"[{roomName}] Đã khởi tạo FloatingUpgradeMenu thành công.");
             }
             else
             {
-                Debug.LogError($"[{roomName}] Không tìm thấy component 'Button' bên trong Prefab UI. Vui lòng kiểm tra lại Prefab!");
+                // Fallback: Prefab cũ không có FloatingUpgradeMenu → gắn sự kiện OnClick trực tiếp
+                Button btn = uiInstance.GetComponent<Button>();
+                if (btn == null) btn = uiInstance.GetComponentInChildren<Button>(true);
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(OnUpgradeButtonClicked);
+                    Debug.Log($"[{roomName}] Fallback: Đã gắn event Click trực tiếp vào nút UI.");
+                }
+                else
+                {
+                    Debug.LogError($"[{roomName}] Không tìm thấy Button hoặc FloatingUpgradeMenu trong Prefab UI!");
+                }
             }
-
-            // Gọi thử lần đầu để cập nhật giá
-            UpdateUIValues();
         }
         else
         {
@@ -150,12 +164,19 @@ public class RoomUpgradeManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Công thức tính số tiền thưởng phòng kiếm được dựa trên level hiện tại
+    /// Thu nhập hiện tại dựa trên level hiện tại
     /// </summary>
     public float GetCurrentIncome()
     {
-        // Ví dụ: Mỗi cấp tăng thêm 25% thu nhập so với cấp trước
         return baseIncome * Mathf.Pow(incomeMultiplier, currentLevel - 1);
+    }
+
+    /// <summary>
+    /// Thu nhập sau khi nâng lên level tiếp theo (dùng để hiển thị preview A → B)
+    /// </summary>
+    public float GetUpgradedIncome()
+    {
+        return baseIncome * Mathf.Pow(incomeMultiplier, currentLevel); // level + 1 - 1 = level
     }
 
     /// <summary>
@@ -199,12 +220,27 @@ public class RoomUpgradeManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Hàm này được gọi từ UI Button vì Unity Event chỉ nhận hàm trả về kiểu void.
+    /// Hàm này được gọi từ UI Button (nhấn vào chữ Nâng cấp trôi nổi trên phòng)
     /// </summary>
     public void OnUpgradeButtonClicked()
     {
-        Debug.LogWarning(">>>>> KÍCH HOẠT NÚT BẤM NÂNG CẤP! Bắt đầu kiểm tra... <<<<<");
-        UpgradeRoom();
+        Debug.LogWarning(">>>>> KÍCH HOẠT MỞ BẢNG NÂNG CẤP TỔNG <<<<<");
+        DoctorUpgradeManager docManager = null;
+        if (roomController != null && roomController.doctor != null)
+        {
+            docManager = roomController.doctor.upgradeManager;
+        }
+
+        if (UpgradeUIController.Instance != null)
+        {
+            UpgradeUIController.Instance.OpenPanel(this, docManager);
+        }
+        else
+        {
+            Debug.LogError("Chưa có UpgradeUIController trong Scene! Không thể mở bảng nâng cấp tổng.");
+            // Backup: Nếu user quên add panel thì rớt xuống mua thẳng
+            UpgradeRoom();
+        }
     }
 
     /// <summary>

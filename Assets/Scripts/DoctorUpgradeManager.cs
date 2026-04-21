@@ -75,14 +75,48 @@ public class DoctorUpgradeManager : MonoBehaviour
         HideAllUpgradeUI();
     }
 
-    /// <summary>
-    /// Unity gọi hàm này khi người chơi click/chạm vào Collider của GameObject chứa script này
-    /// (Yêu cầu: Bác sĩ phải có Collider, ví dụ BoxCollider)
-    /// </summary>
-    private void OnMouseDown()
+    private void Update()
     {
-        // Khi bấm vào bác sĩ, hiện nút Upgrade (chưa vội hiện Tick/X)
-        if (upgradeButtonUI != null) upgradeButtonUI.SetActive(true);
+        // TÍNH NĂNG NÀY ĐÃ BỊ TẮT do việc nâng cấp được gộp vào bảng Upgrade Tổng của phòng:
+        /*
+        if (UnityEngine.InputSystem.Mouse.current != null && UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            // Bỏ qua nếu đang bấm trúng một cái UI
+            if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+                return;
+
+            Camera mainCam = Camera.main;
+            if (mainCam != null)
+            {
+                Ray ray = mainCam.ScreenPointToRay(UnityEngine.InputSystem.Mouse.current.position.ReadValue());
+                if (Physics.Raycast(ray, out RaycastHit hit))
+                {
+                    // Cho phép bấm trúng bản thân Object này, HOẶC bất kỳ cục con nào bên trong nó (phòng khi bạn gắn Collider ở cục Mesh bên trong)
+                    if (hit.collider.gameObject == this.gameObject || hit.collider.transform.IsChildOf(this.transform))
+                    {
+                        Debug.Log($"[DoctorUpgrade] Đã click trúng bác sĩ: {gameObject.name}");
+                        OnDoctorClicked();
+                    }
+                }
+            }
+        }
+        */
+    }
+
+    /// <summary>
+    /// Xử lý hiện giao diện Upgrade khi bác sĩ bị click trúng
+    /// </summary>
+    private void OnDoctorClicked()
+    {
+        if (upgradeButtonUI == null) 
+        {
+            Debug.LogError($"[DoctorUpgrade] LỖI: Chưa kéo giao diện btn_NangCap vào ô 'Upgrade Button UI' ở Inspector của bác sĩ {gameObject.name}!");
+        }
+        else 
+        {
+            upgradeButtonUI.SetActive(true);
+        }
+
         if (confirmPanelUI != null) confirmPanelUI.SetActive(false);
     }
 
