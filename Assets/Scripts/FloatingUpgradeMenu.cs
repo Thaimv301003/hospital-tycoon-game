@@ -98,9 +98,30 @@ public class FloatingUpgradeMenu : MonoBehaviour
         if (closeButton != null)
             closeButton.onClick.AddListener(OnCloseClicked);
         if (roomUpgradeButton != null)
+        {
             roomUpgradeButton.onClick.AddListener(OnRoomUpgradeClicked);
+            // Tắt hiệu ứng màu tự động của Button → không tô xanh khi hover/affordable
+            roomUpgradeButton.transition = Selectable.Transition.None;
+        }
         if (doctorUpgradeButton != null)
+        {
             doctorUpgradeButton.onClick.AddListener(OnDoctorUpgradeClicked);
+            doctorUpgradeButton.transition = Selectable.Transition.None;
+        }
+
+        // Tự động gắn: chạm vào bất kỳ đâu trên InsufficientFundsPanel → dismiss
+        if (insufficientFundsPanel != null)
+        {
+            // Lấy hoặc tự thêm Button component vào panel
+            Button panelBtn = insufficientFundsPanel.GetComponent<Button>();
+            if (panelBtn == null)
+                panelBtn = insufficientFundsPanel.AddComponent<Button>();
+
+            // Xoá màu transition để Button không đổi màu khi hover/click
+            panelBtn.transition = Selectable.Transition.None;
+
+            panelBtn.onClick.AddListener(DismissInsufficientFunds);
+        }
 
         // Trạng thái mặc định: thu gọn, ẩn panel tiền thiếu
         SetExpanded(false, refresh: false);
@@ -155,6 +176,16 @@ public class FloatingUpgradeMenu : MonoBehaviour
         SetExpanded(false, refresh: false);
     }
 
+    /// <summary>
+    /// Chạm vào bất kỳ đâu trên InsufficientFundsPanel → panel biến mất.
+    /// Được tự động gắn vào Button của Panel trong Start().
+    /// </summary>
+    public void DismissInsufficientFunds()
+    {
+        if (insufficientFundsPanel != null)
+            insufficientFundsPanel.SetActive(false);
+    }
+
     private void OnRoomUpgradeClicked()
     {
         if (roomManager == null) return;
@@ -171,7 +202,8 @@ public class FloatingUpgradeMenu : MonoBehaviour
         bool success = roomManager.UpgradeRoom();
         if (success)
         {
-            RefreshAllDisplay();
+            // Nâng cấp thành công → thu gọn về CollapsedView
+            SetExpanded(false, refresh: false);
         }
     }
 
@@ -191,7 +223,8 @@ public class FloatingUpgradeMenu : MonoBehaviour
         bool success = doctorManager.UpgradeDoctor();
         if (success)
         {
-            RefreshAllDisplay();
+            // Nâng cấp thành công → thu gọn về CollapsedView
+            SetExpanded(false, refresh: false);
         }
     }
 
@@ -280,33 +313,24 @@ public class FloatingUpgradeMenu : MonoBehaviour
     /// <summary>
     /// Cập nhật màu sắc + interactable cho cả 2 nút dựa trên tiền hiện có.
     /// Gọi mỗi frame khi menu đang mở (Update).
-    /// </summary>
     private void RefreshButtonStates()
     {
-        float currentMoney = (HospitalManager.Instance != null)
-            ? HospitalManager.Instance.totalRevenue
-            : float.MaxValue;
-
         // Nút Phòng
         if (roomUpgradeButton != null && roomManager != null)
         {
-            bool maxed        = roomManager.currentLevel >= roomManager.maxLevel;
-            bool canAfford    = currentMoney >= roomManager.GetUpgradeCost();
-            bool interactable = !maxed && canAfford;
-
-            roomUpgradeButton.interactable = interactable;
-            SetButtonColor(roomUpgradeButton, interactable ? activeColor : disabledColor);
+            bool maxed = roomManager.currentLevel >= roomManager.maxLevel;
+            // Chỉ disable khi đã MAX — giữ nguyên màu gốc khi chưa max
+            roomUpgradeButton.interactable = !maxed;
+            // Chỉ tô xám khi đạt cấp tối đa, không đổi màu theo tiền
+            if (maxed) SetButtonColor(roomUpgradeButton, disabledColor);
         }
 
         // Nút Bác Sĩ
         if (doctorUpgradeButton != null && doctorManager != null)
         {
-            bool maxed        = doctorManager.currentLevel >= doctorManager.maxLevel;
-            bool canAfford    = currentMoney >= doctorManager.GetUpgradeCost();
-            bool interactable = !maxed && canAfford;
-
-            doctorUpgradeButton.interactable = interactable;
-            SetButtonColor(doctorUpgradeButton, interactable ? activeColor : disabledColor);
+            bool maxed = doctorManager.currentLevel >= doctorManager.maxLevel;
+            doctorUpgradeButton.interactable = !maxed;
+            if (maxed) SetButtonColor(doctorUpgradeButton, disabledColor);
         }
     }
 

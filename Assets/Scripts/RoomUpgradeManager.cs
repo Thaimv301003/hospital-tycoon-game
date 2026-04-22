@@ -68,15 +68,35 @@ public class RoomUpgradeManager : MonoBehaviour
         if (uiInstance != null && uiSpawnPosition != null && Camera.main != null)
         {
             Vector3 screenPos = Camera.main.WorldToScreenPoint(uiSpawnPosition.position);
-            
-            // Xoá/Ẩn UI nếu object lọt ra đằng sau Camera
+
+            // Ẩn UI nếu phòng lọt ra đằng sau Camera
             if (screenPos.z < 0)
             {
                 uiInstance.SetActive(false);
+                return;
+            }
+
+            uiInstance.SetActive(true);
+
+            // Chuyển screen position → local position trong Canvas
+            // (Hoạt động đúng với cả Screen Space Overlay lẫn Screen Space Camera)
+            RectTransform canvasRect = mainCanvasTransform as RectTransform;
+            if (canvasRect != null)
+            {
+                Canvas canvas = mainCanvasTransform.GetComponent<Canvas>();
+                Camera uiCamera = (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceCamera)
+                    ? canvas.worldCamera
+                    : null;
+
+                Vector2 localPos;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    canvasRect, screenPos, uiCamera, out localPos);
+
+                uiRectTransform.localPosition = localPos;
             }
             else
             {
-                uiInstance.SetActive(true);
+                // Fallback đơn giản
                 uiRectTransform.position = screenPos;
             }
         }
@@ -89,7 +109,19 @@ public class RoomUpgradeManager : MonoBehaviour
             // Sinh ra cục UI FloatingUpgradeMenu trong Canvas chính
             uiInstance = Instantiate(uiPrefab, mainCanvasTransform);
             uiInstance.name = "UI_Upgrade_" + roomName;
+
+            // Lấy RectTransform để cập nhật vị trí mỗi frame
+            // Ưu tiên: root → nếu root là 3D GameObject (chỉ có Transform) thì lấy child đầu tiên có RectTransform
             uiRectTransform = uiInstance.GetComponent<RectTransform>();
+            if (uiRectTransform == null)
+            {
+                // Root là GameObject 3D thông thường → tìm RectTransform ở child UI đầu tiên
+                uiRectTransform = uiInstance.GetComponentInChildren<RectTransform>(true);
+                if (uiRectTransform != null)
+                    Debug.Log($"[{roomName}] Root không có RectTransform, dùng child: {uiRectTransform.name}");
+                else
+                    Debug.LogError($"[{roomName}] Không tìm thấy RectTransform nào trong Prefab UI! UI sẽ không định vị được.");
+            }
 
             // Thử link với FloatingUpgradeMenu (thiết kế mới)
             FloatingUpgradeMenu floatingMenu = uiInstance.GetComponent<FloatingUpgradeMenu>();
