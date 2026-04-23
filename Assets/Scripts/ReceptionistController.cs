@@ -4,9 +4,13 @@ using System.Collections;
 public class ReceptionistController : MonoBehaviour
 {
     private Animator anim;
-    
+
     [Header("Trạng thái")]
     public bool isBusy = false;
+
+    [Header("Thời gian xử lý")]
+    [Tooltip("Thời gian (giây) để nhân viên phục vụ 1 bệnh nhân. Sẽ giảm khi nâng cấp nhân viên.")]
+    public float processTime = 3f;
 
     void Awake()
     {

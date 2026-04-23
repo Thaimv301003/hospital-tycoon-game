@@ -39,8 +39,12 @@ public class CameraController : MonoBehaviour
 
     void LateUpdate()
     {
-        HandleZoom();
-        HandlePan();
+        // Khóa trượt và zoom khi đang mở bảng nâng cấp
+        if (!FloatingUpgradeMenu.IsAnyMenuExpanded)
+        {
+            HandleZoom();
+            HandlePan();
+        }
         
         // Di chuyển camera mượt mà từ từ đuổi theo targetPosition
         // Chỉ Lerp bắt mượt khi đang KHÔNG kéo tay/chuột để tránh rung lắc

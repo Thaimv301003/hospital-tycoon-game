@@ -5,7 +5,7 @@ public class DoctorUpgradeManager : MonoBehaviour
     [Header("Doctor Upgrade Info")]
     public string doctorName = "Bác Sĩ Trưởng";
     public int currentLevel = 1;
-    public int maxLevel = 10;
+    public int maxLevel = 5;
 
     [Header("Economy Settings")]
     public float baseUpgradeCost = 150f;

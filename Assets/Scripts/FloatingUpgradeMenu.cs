@@ -82,8 +82,8 @@ public class FloatingUpgradeMenu : MonoBehaviour
     // ===================================================================
     // =====  STATE NỘI BỘ  =====
     // ===================================================================
+    public static bool IsAnyMenuExpanded = false; // Cờ toàn cục để khóa các menu khác
     private bool _isExpanded = false;
-    // Cost đang được xem xét khi hiện thông báo thiếu tiền
     private int _pendingCost = 0;
 
     // ===================================================================
@@ -161,6 +161,8 @@ public class FloatingUpgradeMenu : MonoBehaviour
 
     private void OnExpandClicked()
     {
+        if (IsAnyMenuExpanded) return; // Nếu đã có menu nào đó mở thì chặn, không cho mở menu này
+
         SetExpanded(true, refresh: true);
     }
 
@@ -235,6 +237,10 @@ public class FloatingUpgradeMenu : MonoBehaviour
     private void SetExpanded(bool expanded, bool refresh)
     {
         _isExpanded = expanded;
+        
+        // Cập nhật trạng thái khóa toàn cục
+        if (expanded) IsAnyMenuExpanded = true;
+        else IsAnyMenuExpanded = false;
 
         if (collapsedView != null) collapsedView.SetActive(!expanded);
         if (expandedView != null) expandedView.SetActive(expanded);
