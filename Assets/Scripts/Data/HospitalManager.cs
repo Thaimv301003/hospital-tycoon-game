@@ -22,7 +22,24 @@ public class HospitalManager : MonoBehaviour
     [Tooltip("Tiền mặt hiện tại của bệnh viện")]
     public int totalRevenue = 500; // Cấp số vốn ban đầu là 500đ để có tiền Test game
     
-    
+    [Header("Debug Cheat (Chỉ dùng để Test)")]
+    [Tooltip("Gõ số tiền muốn thêm vào đây rồi nhấn Enter để cộng tiền ngay lập tức")]
+    public int addMoneyCheat = 0;
+
+    private void OnValidate()
+    {
+        if (addMoneyCheat > 0)
+        {
+            totalRevenue += addMoneyCheat;
+            Debug.Log($"[Cheat] Đã cộng thêm {addMoneyCheat}. Tổng tiền mới: {totalRevenue}");
+            addMoneyCheat = 0; // Reset về 0 để có thể nhập tiếp lần sau
+
+            if (Application.isPlaying)
+            {
+                UpdateMoneyUI();
+            }
+        }
+    }
     [Header("UI References")]
     public TMP_Text moneyText;
     public TMP_Text patientsText;

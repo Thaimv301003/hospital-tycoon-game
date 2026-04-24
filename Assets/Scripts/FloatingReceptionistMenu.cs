@@ -53,6 +53,12 @@ public class FloatingReceptionistMenu : MonoBehaviour
     [Tooltip("Text bên trong nút (tuỳ chọn, vd: '120$' hoặc 'TỐI ĐA')")]
     public TextMeshProUGUI staffUpgradeButtonText;
 
+    [Header("--- Panel Nhân Viên (Bật/Tắt theo Level) ---")]
+    [Tooltip("Kéo object chứa các thông tin nâng cấp (Level, Time, Button...) vào đây")]
+    public GameObject staffNormalContent;
+    [Tooltip("Kéo object chứa thông báo 'ĐÃ MAX' vào đây")]
+    public GameObject staffMaxContent;
+
     // ----- Thiếu tiền -----
     [Header("--- Thông Báo Thiếu Tiền ---")]
     [Tooltip("Panel popup hiện khi không đủ tiền")]
@@ -224,6 +230,10 @@ public class FloatingReceptionistMenu : MonoBehaviour
 
         if (staffUpgradeButtonText != null)
             staffUpgradeButtonText.text = isMaxed ? "TỐI ĐA" : costLabel;
+
+        // Chuyển đổi Panel
+        if (staffNormalContent != null) staffNormalContent.SetActive(!isMaxed);
+        if (staffMaxContent != null)    staffMaxContent.SetActive(isMaxed);
 
         RefreshButtonState();
     }

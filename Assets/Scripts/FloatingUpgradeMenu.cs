@@ -49,6 +49,12 @@ public class FloatingUpgradeMenu : MonoBehaviour
     [Tooltip("Text ở giữa nút Nâng Cấp Phòng (tuỳ chọn)")]
     public TextMeshProUGUI roomUpgradeButtonText;
 
+    [Header("--- Panel Phòng (Bật/Tắt theo Level) ---")]
+    [Tooltip("Kéo object chứa các thông tin nâng cấp (Level, Income, Button...) vào đây")]
+    public GameObject roomNormalContent;
+    [Tooltip("Kéo object chứa thông báo 'ĐÃ MAX' vào đây")]
+    public GameObject roomMaxContent;
+
     // ----- Card Nâng Cấp BÁC SĨ -----
     [Header("--- Card Bác Sĩ (bên phải) ---")]
     [Tooltip("Bao ngoài toàn bộ Card Bác Sĩ — Script tự ẩn đi nếu phòng không có BS")]
@@ -62,6 +68,12 @@ public class FloatingUpgradeMenu : MonoBehaviour
     public Button doctorUpgradeButton;
     [Tooltip("Text ở giữa nút Nâng Cấp BS (tuỳ chọn)")]
     public TextMeshProUGUI doctorUpgradeButtonText;
+
+    [Header("--- Panel Bác Sĩ (Bật/Tắt theo Level) ---")]
+    [Tooltip("Kéo object chứa các thông tin nâng cấp bác sĩ vào đây")]
+    public GameObject doctorNormalContent;
+    [Tooltip("Kéo object chứa thông báo bác sĩ 'ĐÃ MAX' vào đây")]
+    public GameObject doctorMaxContent;
 
     // ----- Thông báo "Thiếu tiền" -----
     [Header("--- Thông Báo Thiếu Tiền (bấm X khi thiếu tiền) ---")]
@@ -280,9 +292,14 @@ public class FloatingUpgradeMenu : MonoBehaviour
         }
 
         // Chi phí + text trong nút
+        // Chi phí + text trong nút
         string costLabel = isMaxed ? "ĐÃ MAX" : $"{Mathf.RoundToInt(roomManager.GetUpgradeCost())}$";
         if (roomCostText != null)          roomCostText.text = $"Chi phí: {costLabel}";
         if (roomUpgradeButtonText != null) roomUpgradeButtonText.text = isMaxed ? "TỐI ĐA" : costLabel;
+
+        // Chuyển đổi Panel
+        if (roomNormalContent != null) roomNormalContent.SetActive(!isMaxed);
+        if (roomMaxContent != null)    roomMaxContent.SetActive(isMaxed);
     }
 
     private void RefreshDoctorCard()
@@ -311,9 +328,14 @@ public class FloatingUpgradeMenu : MonoBehaviour
         }
 
         // Chi phí + text trong nút
+        // Chi phí + text trong nút
         string costLabel = isMaxed ? "ĐÃ MAX" : $"{Mathf.RoundToInt(doctorManager.GetUpgradeCost())}$";
         if (doctorCostText != null)          doctorCostText.text = $"Chi phí: {costLabel}";
         if (doctorUpgradeButtonText != null) doctorUpgradeButtonText.text = isMaxed ? "TỐI ĐA" : costLabel;
+
+        // Chuyển đổi Panel
+        if (doctorNormalContent != null) doctorNormalContent.SetActive(!isMaxed);
+        if (doctorMaxContent != null)    doctorMaxContent.SetActive(isMaxed);
     }
 
     /// <summary>
