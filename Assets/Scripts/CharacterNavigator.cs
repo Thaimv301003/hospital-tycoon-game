@@ -106,7 +106,7 @@ public class CharacterNavigator : MonoBehaviour
             agent.velocity = Vector3.zero; // Triệt tiêu quán tính để không bị trượt
         }
 
-        if (currentPhase == PatientPhase.GoingToQueue || currentPhase == PatientPhase.Leaving)
+        if (currentPhase == PatientPhase.GoingToQueue || currentPhase == PatientPhase.WaitingInQueue || currentPhase == PatientPhase.Leaving)
         {
             if (!isCelebrating) HandleMovement();
         }

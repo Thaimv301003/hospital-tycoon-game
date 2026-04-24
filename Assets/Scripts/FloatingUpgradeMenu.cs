@@ -45,6 +45,8 @@ public class FloatingUpgradeMenu : MonoBehaviour
     public TextMeshProUGUI roomIncomeText;
     [Tooltip("'Chi phí: 100$'")]
     public TextMeshProUGUI roomCostText;
+    [Tooltip("'Lượt khám: 1 → 3'")]
+    public TextMeshProUGUI roomDirtyText;
     public Button roomUpgradeButton;
     [Tooltip("Text ở giữa nút Nâng Cấp Phòng (tuỳ chọn)")]
     public TextMeshProUGUI roomUpgradeButtonText;
@@ -291,7 +293,26 @@ public class FloatingUpgradeMenu : MonoBehaviour
                 : $"Thu nhập: {Mathf.RoundToInt(curIncome)}$ → {Mathf.RoundToInt(roomManager.GetUpgradedIncome())}$";
         }
 
-        // Chi phí + text trong nút
+        // Sức chứa bệnh nhân (trước khi bẩn)
+        if (roomDirtyText != null)
+        {
+            if (roomManager.roomController != null && roomManager.roomController.canGetDirty)
+            {
+                int curDirty = 1 + (curLevel - 1) * 2;
+                int nextDirty = 1 + (curLevel) * 2;
+                
+                roomDirtyText.gameObject.SetActive(true);
+                roomDirtyText.text = isMaxed
+                    ? $"Lượt khám: {curDirty} (MAX)"
+                    : $"Lượt khám: {curDirty} → {nextDirty}";
+            }
+            else
+            {
+                // Ẩn đi nếu phòng không dùng cơ chế bẩn
+                roomDirtyText.gameObject.SetActive(false);
+            }
+        }
+
         // Chi phí + text trong nút
         string costLabel = isMaxed ? "ĐÃ MAX" : $"{Mathf.RoundToInt(roomManager.GetUpgradeCost())}$";
         if (roomCostText != null)          roomCostText.text = $"Chi phí: {costLabel}";
@@ -322,12 +343,14 @@ public class FloatingUpgradeMenu : MonoBehaviour
             float baseTime = GetBaseProcessTime();
             float curTime  = baseTime * Mathf.Pow(0.8f, curLevel - 1);
             float nextTime = baseTime * Mathf.Pow(0.8f, curLevel);      // level + 1 - 1 = level
+            
             doctorTimeText.text = isMaxed
                 ? $"Khám: {curTime:F1}s (MIN)"
                 : $"Khám: {curTime:F1}s → {nextTime:F1}s";
         }
 
-        // Chi phí + text trong nút
+
+
         // Chi phí + text trong nút
         string costLabel = isMaxed ? "ĐÃ MAX" : $"{Mathf.RoundToInt(doctorManager.GetUpgradeCost())}$";
         if (doctorCostText != null)          doctorCostText.text = $"Chi phí: {costLabel}";

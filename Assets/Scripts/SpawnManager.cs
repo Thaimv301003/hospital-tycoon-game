@@ -14,8 +14,9 @@ public class SpawnManager : MonoBehaviour
     [Tooltip("Kéo thả Node Waypoint cuối cùng mà NPC bắt buộc phải đi tới trước khi rẽ ra cổng (Exit Point)")]
     public WaypointNode finalExitNode; 
 
-    [Header("Status (Read Only)")]
-    [SerializeField] private float currentInterval = 3f;
+    [Header("Cấu hình Tốc độ (Thủ công)")]
+    [Tooltip("Thời gian đẻ bệnh nhân (đơn vị: Giây). Ví dụ gõ 5 thì cứ 5 giây đẻ 1 người.")]
+    public float spawnIntervalInSeconds = 5f;
 
     void Start()
     {
@@ -37,46 +38,14 @@ public class SpawnManager : MonoBehaviour
 
         while (true)
         {
-            // 1. Cập nhật tốc độ đẻ dựa trên tình hình bệnh viện
-            UpdateSpawnInterval();
-
-            // 2. Spawn NPC trực tiếp không cần kiểm tra Waypoint
+            // 1. Spawn NPC
             SpawnPatient();
 
-            // 3. Nghỉ một khoảng thời gian trước khi đẻ người tiếp theo
-            yield return new WaitForSeconds(currentInterval);
+            // 2. Nghỉ theo đúng số giây bạn đã nhập trên Inspector
+            yield return new WaitForSeconds(spawnIntervalInSeconds);
         }
     }
 
-    void UpdateSpawnInterval()
-    {
-        // Nếu không tìm thấy Manager, dùng tốc độ mặc định trong settings
-        if (HospitalManager.Instance == null)
-        {
-            currentInterval = 1f / settings.baseSpawnRate;
-            return;
-        }
-
-        // Lấy năng lực xử lý (Throughput)
-        float effectiveTP = HospitalManager.Instance.GetEffectiveThroughput();
-
-        // Lấy tổng số người đang đợi
-        int currentQueue = HospitalManager.Instance.GetTotalCurrentQueue();
-
-        // Thuật toán điều chỉnh (Adaptive Bias)
-        float queueBias = 1.0f;
-        if (currentQueue < settings.idealQueueSize)
-            queueBias = 1.5f; // Đẻ nhanh hơn nếu hàng đợi quá vắng
-        else if (currentQueue > settings.idealQueueSize * 2)
-            queueBias = 0.5f; // Đẻ chậm lại nếu hàng đợi quá tải
-
-        // Công thức: Rate = Năng lực * Tải mục tiêu * Bias
-        float spawnRatePerSecond = effectiveTP * settings.targetLoad * queueBias;
-
-        // Đảm bảo không bị chia cho 0
-        spawnRatePerSecond = Mathf.Max(spawnRatePerSecond, 0.05f);
-        currentInterval = 1f / spawnRatePerSecond;
-    }
 
     void SpawnPatient()
     {

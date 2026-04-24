@@ -19,6 +19,29 @@ public class RoomController : MonoBehaviour
     public ReceptionistController receptionist;
     public DoctorController doctor;
 
+    [Header("Điểm Khám/Phục Vụ")]
+    [Tooltip("Vị trí bệnh nhân sẽ đứng để được khám (ngoài hàng đợi)")]
+    public Transform servicePoint;
+
+    [Header("Vệ Sinh Phòng (Cleaning)")]
+    public bool canGetDirty = true;
+    public bool isDirty = false;
+    [Tooltip("Số lượng bệnh nhân khám tối đa trước khi phòng bị bẩn")]
+    public int treatmentsBeforeDirty = 1;
+    private int treatmentsSinceClean = 0;
+    
+    [Header("UI Dọn Dẹp (Giống UI Nâng Cấp)")]
+    [Tooltip("Kéo Prefab nút Dọn Dẹp (nút cái chổi) vào đây")]
+    public GameObject cleanUIPrefab;
+    [Tooltip("Kéo Canvas tổng (chứa UI) vào đây")]
+    public Transform mainCanvasTransform;
+    [Tooltip("Vị trí lơ lửng của nút Dọn dẹp (có thể dùng chung UISpawn của UI nâng cấp)")]
+    public Transform cleanUISpawnPosition;
+    
+    private GameObject cleanUIInstance;
+    private RectTransform cleanUIRect;
+    private Camera mainCamera;
+
     [Header("Runtime State")]
     public int currentPatientsProcessing = 0;
 
@@ -32,6 +55,27 @@ public class RoomController : MonoBehaviour
 
     void Start()
     {
+        mainCamera = Camera.main;
+        
+        // Sinh ra nút Dọn dẹp từ Prefab vào Canvas Tổng (Nhưng ẩn đi)
+        if (cleanUIPrefab != null && mainCanvasTransform != null)
+        {
+            cleanUIInstance = Instantiate(cleanUIPrefab, mainCanvasTransform);
+            cleanUIInstance.name = "UI_Clean_" + gameObject.name;
+            cleanUIRect = cleanUIInstance.GetComponent<RectTransform>();
+            
+            // Tìm nút bấm (Button) trong prefab và gắn sự kiện
+            UnityEngine.UI.Button btn = cleanUIInstance.GetComponentInChildren<UnityEngine.UI.Button>();
+            if (btn != null) btn.onClick.AddListener(CleanRoom);
+            
+            cleanUIInstance.SetActive(false); // Ẩn lúc mới vào game
+        }
+        
+        if (roomType == RoomType.Reception || roomType == RoomType.Payment)
+        {
+            canGetDirty = false;
+        }
+
         // Bước 1: Khởi tạo chỉ số phòng
         UpdateRoomStats(); 
         
@@ -68,6 +112,10 @@ public class RoomController : MonoBehaviour
 
             // Áp dụng công thức Toán học: baseTime * 0.8^(Level - 1)
             currentProcessTime = roomData.baseProcessTime * Mathf.Pow(0.8f, levelToCalculate - 1);
+
+            // Tăng số lượng bệnh nhân khám được trước khi phòng bị bẩn dựa theo level CỦA PHÒNG
+            // Level 1: 1 người, Level 2: 3 người, Level 3: 5 người...
+            treatmentsBeforeDirty = 1 + (roomLevel - 1) * 2;
         }
         else
         {
@@ -79,6 +127,35 @@ public class RoomController : MonoBehaviour
 
     public float GetRoomThroughput() => currentCapacity / currentProcessTime;
 
+    private void Update()
+    {
+        // Cập nhật vị trí nút Dọn dẹp chạy theo camera giống hệt UI nâng cấp
+        if (cleanUIInstance != null && cleanUIInstance.activeSelf && cleanUIRect != null && cleanUISpawnPosition != null && mainCamera != null)
+        {
+            Vector3 screenPos = mainCamera.WorldToScreenPoint(cleanUISpawnPosition.position);
+            
+            // Tránh việc UI nhảy ra sau lưng camera
+            if (screenPos.z > 0)
+            {
+                RectTransform canvasRect = mainCanvasTransform as RectTransform;
+                if (canvasRect != null)
+                {
+                    Vector2 localPos;
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPos, null, out localPos);
+                    cleanUIRect.localPosition = localPos;
+                }
+                else
+                {
+                    cleanUIRect.position = screenPos;
+                }
+            }
+            else
+            {
+                cleanUIRect.position = new Vector3(-9999, -9999, 0); // Giấu UI đi nếu quay lưng lại
+            }
+        }
+    }
+
     public void ReceivePatient(CharacterNavigator patient)
     {
         waitingPatients.Enqueue(patient);
@@ -87,6 +164,9 @@ public class RoomController : MonoBehaviour
 
     private void TryStartTreating()
     {
+        // NẾU PHÒNG ĐANG BẨN -> CHẶN KHÔNG CHO KHÁM, BỆNH NHÂN ĐỨNG ĐỢI
+        if (isDirty) return;
+
         if (waitingPatients.Count > 0 && currentPatientsProcessing < currentCapacity)
         {
             CharacterNavigator patientToTreat = waitingPatients.Dequeue();
@@ -97,12 +177,22 @@ public class RoomController : MonoBehaviour
 
     IEnumerator ProcessRoutine(CharacterNavigator patient)
     {
-        // 1. Theo thiết kế mới: Vị trí đầu tiên của hàng đợi (điểm ghim) chính là nơi tương tác làm việc.
-        // Chuyển trạng thái bệnh nhân sang Treating luôn.
-        patient.currentPhase = CharacterNavigator.PatientPhase.Treating;
-        patient.hasArrivedAtDesk = true;
+        // 1. Yêu cầu bệnh nhân đi tới Service Point nếu có gán
+        if (servicePoint != null)
+        {
+            patient.WalkToDesk(servicePoint.position);
+            // Đợi cho đến khi bệnh nhân thực sự đi tới nơi
+            yield return new WaitUntil(() => patient.hasArrivedAtDesk);
+        }
+        else
+        {
+            // Nếu không có ServicePoint, bệnh nhân đứng tại đầu hàng khám luôn (Cơ chế cũ)
+            patient.hasArrivedAtDesk = true;
+        }
 
-        // 2. Xoay mặt bệnh nhân đối diện với Lễ tân / Bác sĩ cho tự nhiên
+        // 2. Chuyển trạng thái sang Treating và xoay mặt
+        patient.currentPhase = CharacterNavigator.PatientPhase.Treating;
+
         Vector3 lookTarget = transform.position;
         if (receptionist != null) lookTarget = receptionist.transform.position;
         else if (doctor != null) lookTarget = doctor.transform.position;
@@ -112,7 +202,7 @@ public class RoomController : MonoBehaviour
         if (lookDir.sqrMagnitude > 0.001f)
             patient.transform.rotation = Quaternion.LookRotation(lookDir);
 
-        // 3. Lúc này bệnh nhân đã sẵn sàng, mới bắt đầu bật Animation phục vụ
+        // 3. Bắt đầu phục vụ (Animation nhân viên)
         if (receptionist != null && !receptionist.isBusy)
         {
             StartCoroutine(receptionist.ServePatient(patient, currentProcessTime));
@@ -148,11 +238,46 @@ public class RoomController : MonoBehaviour
         }
 
         patient.FinishTreatmentAndMoveOn();
+        
+        // --- CƠ CHẾ DỌN DẸP ---
+        if (canGetDirty)
+        {
+            treatmentsSinceClean++;
+            if (treatmentsSinceClean >= treatmentsBeforeDirty)
+            {
+                isDirty = true;
+                if (cleanUIInstance != null) cleanUIInstance.SetActive(true);
+                Debug.Log($"[RoomController] Phòng {gameObject.name} đã bị bẩn! Đang chờ dọn dẹp.");
+            }
+            else
+            {
+                TryStartTreating();
+            }
+        }
+        else
+        {
+            TryStartTreating();
+        }
+    }
+
+    /// <summary>
+    /// Hàm này được gọi khi Player bấm vào nút Dọn Dẹp trên UI
+    /// </summary>
+    public void CleanRoom()
+    {
+        isDirty = false;
+        treatmentsSinceClean = 0;
+        if (cleanUIInstance != null) cleanUIInstance.SetActive(false);
+        Debug.Log($"[RoomController] Phòng {gameObject.name} đã sạch sẽ.");
+        
+        // Tiếp tục gọi bệnh nhân tiếp theo vào khám ngay lập tức
         TryStartTreating();
     }
 
     private void OnDestroy()
     {
         if (HospitalManager.Instance != null) HospitalManager.Instance.UnregisterRoom(this);
+        // Nhớ xóa cục UI khi phòng bị xóa để tránh rác
+        if (cleanUIInstance != null) Destroy(cleanUIInstance);
     }
 }
