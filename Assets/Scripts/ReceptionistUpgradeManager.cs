@@ -43,6 +43,17 @@ public class ReceptionistUpgradeManager : MonoBehaviour
     [Tooltip("Kéo ReceptionistController của phòng này vào đây")]
     public ReceptionistController receptionistController;
 
+    [Header("Upgrade Effects")]
+    [Tooltip("Particle System (hiệu ứng hạt) dựng sẵn trong Scene, nếu có")]
+    public ParticleSystem upgradeParticles;
+    public AudioSource audioSource;
+    public AudioClip upgradeSound;
+    
+    [Tooltip("Kéo Prefab hiệu ứng (VFX) tải từ ngoài vào đây. Nó sẽ được Instantiate ra khi nâng cấp.")]
+    public GameObject upgradeEffectPrefab;
+    [Tooltip("Vị trí sinh ra Prefab hiệu ứng ngoài. Nếu để trống, sẽ sinh ra ở ngay gốc tọa độ của quầy.")]
+    public Transform effectSpawnPoint;
+
     // ===================================================================
     // INTERNAL STATE
     // ===================================================================
@@ -182,6 +193,23 @@ public class ReceptionistUpgradeManager : MonoBehaviour
         // Cập nhật processTime của ReceptionistController
         SyncProcessTime();
 
+        // Chạy hiệu ứng hạt (Particles), âm thanh và VFX Prefab
+        PlayUpgradeEffects();
+
+        // Zoom Camera vào phòng khi nâng cấp thành công
+        CameraController camController = CameraController.Instance;
+        if (camController == null) camController = FindObjectOfType<CameraController>();
+
+        if (camController != null)
+        {
+            Vector3 focusPos = uiSpawnPosition != null ? uiSpawnPosition.position : transform.position;
+            camController.FocusOnRoom(focusPos);
+        }
+        else
+        {
+            Debug.LogError($"[{staffName}] KHÔNG TÌM THẤY CameraController TRONG SCENE ĐỂ ZOOM!");
+        }
+
         return true;
     }
 
@@ -194,5 +222,31 @@ public class ReceptionistUpgradeManager : MonoBehaviour
     {
         if (receptionistController != null)
             receptionistController.processTime = GetCurrentProcessTime();
+    }
+
+    /// <summary>Khởi chạy các hiệu ứng ánh sáng, hạt bụi và âm thanh khi nâng cấp</summary>
+    private void PlayUpgradeEffects()
+    {
+        // 1. Bật Particle System tĩnh có sẵn trong Scene
+        if (upgradeParticles != null)
+        {
+            upgradeParticles.Play();
+        }
+
+        // 2. Chơi âm thanh nâng cấp
+        if (audioSource != null && upgradeSound != null)
+        {
+            audioSource.PlayOneShot(upgradeSound);
+        }
+
+        // 3. Sinh ra Prefab hiệu ứng động (nếu có kéo vào inspector)
+        if (upgradeEffectPrefab != null)
+        {
+            Vector3 spawnPos = effectSpawnPoint != null ? effectSpawnPoint.position : transform.position;
+            GameObject vfx = Instantiate(upgradeEffectPrefab, spawnPos, Quaternion.identity);
+            
+            // Xóa hiệu ứng sau 3 giây để tránh rác RAM
+            Destroy(vfx, 3f);
+        }
     }
 }

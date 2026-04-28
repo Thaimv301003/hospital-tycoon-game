@@ -81,8 +81,10 @@ public class FloatingUpgradeMenu : MonoBehaviour
     [Header("--- Thông Báo Thiếu Tiền (bấm X khi thiếu tiền) ---")]
     [Tooltip("Panel popup hiện khi bấm X hoặc bấm nút khi thiếu tiền")]
     public GameObject insufficientFundsPanel;
-    [Tooltip("Text hiện số tiền cần thêm")]
+    [Tooltip("Text hiện số tiền cần thêm. Hãy gõ ($) vào chữ này trong Inspector để làm chỗ điền tiền.")]
     public TextMeshProUGUI insufficientFundsText;
+
+    private string _insufficientFundsTemplate = "";
 
     // ===================================================================
     // =====  MÀU SẮC  =====
@@ -141,6 +143,12 @@ public class FloatingUpgradeMenu : MonoBehaviour
         SetExpanded(false, refresh: false);
         if (insufficientFundsPanel != null)
             insufficientFundsPanel.SetActive(false);
+
+        // Lưu câu báo thiếu tiền hiện tại để làm template
+        if (insufficientFundsText != null)
+        {
+            _insufficientFundsTemplate = insufficientFundsText.text;
+        }
     }
 
     private void Update()
@@ -176,6 +184,9 @@ public class FloatingUpgradeMenu : MonoBehaviour
     private void OnExpandClicked()
     {
         if (IsAnyMenuExpanded) return; // Nếu đã có menu nào đó mở thì chặn, không cho mở menu này
+
+        // Đẩy UI này xuống dưới cùng danh sách Canvas để vẽ ĐÈ lên trên tất cả các UI khác
+        transform.SetAsLastSibling();
 
         SetExpanded(true, refresh: true);
     }
@@ -404,7 +415,20 @@ public class FloatingUpgradeMenu : MonoBehaviour
         {
             int have     = Mathf.RoundToInt(HospitalManager.Instance.totalRevenue);
             int shortage = requiredCost - have;
-            insufficientFundsText.text = $"Không đủ tiền!\nCần thêm <color=#FF5555>{shortage}$</color> để nâng cấp.";
+            // Nếu có ($) trong template thì thay thế bằng số tiền còn thiếu
+            if (_insufficientFundsTemplate.Contains("($)"))
+            {
+                insufficientFundsText.text = _insufficientFundsTemplate.Replace("($)", shortage.ToString());
+            }
+            // Giữ lại hỗ trợ {0} nếu trước đây bạn từng dùng
+            else if (_insufficientFundsTemplate.Contains("{0}"))
+            {
+                insufficientFundsText.text = string.Format(_insufficientFundsTemplate, shortage);
+            }
+            else
+            {
+                insufficientFundsText.text = _insufficientFundsTemplate;
+            }
         }
     }
 

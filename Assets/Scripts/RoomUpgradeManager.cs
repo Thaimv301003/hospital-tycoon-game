@@ -239,6 +239,12 @@ public class RoomUpgradeManager : MonoBehaviour
         currentLevel++;
         Debug.Log($"[{roomName}] Đã nâng cấp lên Level {currentLevel}!");
 
+        if (roomController != null)
+        {
+            roomController.roomLevel = currentLevel;
+            roomController.UpdateRoomStats();
+        }
+
         // Cập nhật lại UI sau khi mua (để đổi level mới, giá mới)
         UpdateUIValues();
 
@@ -247,6 +253,20 @@ public class RoomUpgradeManager : MonoBehaviour
 
         // Cập nhật lại đồ vật trang trí trong phòng và bật hiệu ứng nhún nảy
         UpdateVisuals(true);
+
+        // Zoom Camera vào chính giữa phòng (dùng uiSpawnPosition làm tâm ngắm)
+        CameraController camController = CameraController.Instance;
+        if (camController == null) camController = FindObjectOfType<CameraController>();
+
+        if (camController != null)
+        {
+            Vector3 focusPos = uiSpawnPosition != null ? uiSpawnPosition.position : transform.position;
+            camController.FocusOnRoom(focusPos);
+        }
+        else
+        {
+            Debug.LogError($"[{roomName}] KHÔNG TÌM THẤY CameraController TRONG SCENE ĐỂ ZOOM!");
+        }
 
         return true;
     }

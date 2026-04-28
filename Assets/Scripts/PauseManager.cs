@@ -6,6 +6,9 @@ public class PauseManager : MonoBehaviour
     [Header("UI Panels")]
     [Tooltip("Kéo thả Panel Menu Tạm Dừng (Pause Menu) vào đây")]
     public GameObject pauseMenuPanel;
+    
+    [Tooltip("Kéo thả nút Pause (nút nhỏ ở góc) vào đây để ẩn khi Menu đang bật")]
+    public GameObject pauseButton;
 
     private void Start()
     {
@@ -27,6 +30,12 @@ public class PauseManager : MonoBehaviour
         {
             pauseMenuPanel.SetActive(true); // Hiện bảng Pause Menu lên
         }
+        
+        // Ẩn nút Pause góc màn hình đi
+        if (pauseButton != null)
+        {
+            pauseButton.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -39,6 +48,12 @@ public class PauseManager : MonoBehaviour
         if (pauseMenuPanel != null)
         {
             pauseMenuPanel.SetActive(false); // Ẩn bảng Pause Menu đi
+        }
+        
+        // Hiện lại nút Pause góc màn hình
+        if (pauseButton != null)
+        {
+            pauseButton.SetActive(true);
         }
     }
 

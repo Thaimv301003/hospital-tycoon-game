@@ -8,6 +8,8 @@ using UnityEngine.InputSystem.Controls;
 /// </summary>
 public class CameraController : MonoBehaviour
 {
+    public static CameraController Instance { get; private set; }
+
     [Header("Pan Settings (Trượt)")]
     [Tooltip("Tốc độ bắt mượt của Camera (10 là vừa đẹp)")]
     public float smoothSpeed = 10f;
@@ -25,9 +27,24 @@ public class CameraController : MonoBehaviour
     [Tooltip("Độ phóng to xa màn hình nhất (Hoặc độ cao tối đa cho 3D)")]
     public float maxZoom = 40f;
 
+    [Header("Cinematic Focus Zoom (Khi nâng cấp)")]
+    [Tooltip("Hệ số zoom khi focus (0.6 = zoom vào 60% so với hiện tại)")]
+    [Range(0.1f, 1f)] public float focusZoomFactor = 0.6f;
+    [Tooltip("Thời gian phi sát vào (giây)")]
+    public float focusZoomInTime = 0.3f;
+    [Tooltip("Thời gian đứng chờ xem hiệu ứng (giây)")]
+    public float focusHoldTime = 0.5f;
+    [Tooltip("Thời gian dãn ra lại bình thường (giây)")]
+    public float focusZoomOutTime = 0.4f;
+
     private Camera cam;
     private Vector3 dragOrigin;
     private Vector3 targetPosition;
+
+    private void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
@@ -173,9 +190,9 @@ public class CameraController : MonoBehaviour
         }
         else
         {
-            targetPosition += transform.forward * scrollAmount * zoomSpeed * 15f;
-            targetPosition.y = Mathf.Clamp(targetPosition.y, minZoom, maxZoom);
-            transform.position = targetPosition; // Cập nhật luôn tránh lag do Lerp
+            // Thay đổi góc nhìn (FOV) thay vì dịch chuyển trục Y (rất hiệu quả với FOV hẹp như 14)
+            cam.fieldOfView -= scrollAmount * zoomSpeed * 10f;
+            cam.fieldOfView = Mathf.Clamp(cam.fieldOfView, minZoom, maxZoom);
         }
     }
 
@@ -264,5 +281,92 @@ public class CameraController : MonoBehaviour
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Di chuyển và zoom Camera vào một vị trí cụ thể (ví dụ: Phòng khám)
+    /// </summary>
+    public void FocusOnRoom(Vector3 roomPos)
+    {
+        // 1. Tạo mặt phẳng ngang đúng bằng độ cao của điểm chỉ định
+        Plane groundPlane = new Plane(Vector3.up, new Vector3(0, roomPos.y, 0));
+        Ray centerRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        
+        if (groundPlane.Raycast(centerRay, out float hitDistance))
+        {
+            Vector3 centerGroundPos = centerRay.GetPoint(hitDistance);
+            
+            // 2. Tính khoảng cách cần dịch chuyển
+            Vector3 difference = roomPos - centerGroundPos;
+            
+            // 3. Cộng khoảng cách vào vị trí đích của Camera (để camera lướt theo)
+            targetPosition += difference;
+            
+            // Ép vị trí không vượt rào
+            targetPosition.x = Mathf.Clamp(targetPosition.x, limitX.x, limitX.y);
+            targetPosition.z = Mathf.Clamp(targetPosition.z, limitZ.x, limitZ.y);
+        }
+        else
+        {
+            Debug.LogWarning("[CameraController] Raycast thất bại (Camera đang thấp hơn điểm ngắm hoặc nhìn ngược hướng). Vẫn sẽ thực hiện Zoom!");
+        }
+
+        // 4. Zoom lại gần (phóng to) bằng FOV (LUÔN CHẠY BẤT CHẤP RAYCAST)
+        float targetZoomLevel;
+        if (cam.orthographic)
+        {
+            targetZoomLevel = cam.orthographicSize * focusZoomFactor;
+        }
+        else
+        {
+            targetZoomLevel = cam.fieldOfView * focusZoomFactor;
+        }
+        
+        Debug.Log($"[CameraController] Bắt đầu Zoom từ {cam.fieldOfView} xuống {targetZoomLevel}");
+        StartCoroutine(SmoothZoom(targetZoomLevel));
+    }
+
+    private System.Collections.IEnumerator SmoothZoom(float targetZoom)
+    {
+        float elapsedTime = 0f;
+        
+        float originalOrtho = cam.orthographicSize;
+        float originalFov = cam.fieldOfView;
+
+        // 1. ZOOM IN
+        while (elapsedTime < focusZoomInTime)
+        {
+            if (cam.orthographic)
+                cam.orthographicSize = Mathf.Lerp(originalOrtho, targetZoom, elapsedTime / focusZoomInTime);
+            else
+                cam.fieldOfView = Mathf.Lerp(originalFov, targetZoom, elapsedTime / focusZoomInTime);
+                
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        
+        // Đảm bảo thông số đạt chuẩn
+        if (cam.orthographic) cam.orthographicSize = targetZoom;
+        else cam.fieldOfView = targetZoom;
+
+        // 2. HOLD (Đứng xem hiệu ứng nâng cấp)
+        yield return new WaitForSeconds(focusHoldTime);
+
+        // 3. ZOOM OUT (Trở về như cũ)
+        elapsedTime = 0f;
+        while (elapsedTime < focusZoomOutTime)
+        {
+            if (cam.orthographic)
+                cam.orthographicSize = Mathf.Lerp(targetZoom, originalOrtho, elapsedTime / focusZoomOutTime);
+            else
+                cam.fieldOfView = Mathf.Lerp(targetZoom, originalFov, elapsedTime / focusZoomOutTime);
+                
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+
+        // Đảm bảo quay về chính xác thông số ban đầu
+        if (cam.orthographic) cam.orthographicSize = originalOrtho;
+        else cam.fieldOfView = originalFov;
     }
 }
