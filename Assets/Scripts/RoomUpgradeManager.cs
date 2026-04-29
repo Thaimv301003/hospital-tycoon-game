@@ -295,6 +295,8 @@ public class RoomUpgradeManager : MonoBehaviour
         }
     }
 
+    public void UpdateVisualsFalse() { UpdateVisuals(false); }
+
     /// <summary>
     /// Quản lý việc bật/tắt đồ vật trang trí dựa vào cấp hiện tại. Hỗ trợ thay thế đồ cũ bằng đồ mới.
     /// </summary>

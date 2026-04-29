@@ -217,6 +217,8 @@ public class ReceptionistUpgradeManager : MonoBehaviour
     // INTERNAL HELPERS
     // ===================================================================
 
+    public void SyncProcessTimePublic() { SyncProcessTime(); }
+
     /// <summary>Đồng bộ processTime của ReceptionistController theo level hiện tại.</summary>
     private void SyncProcessTime()
     {

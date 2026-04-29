@@ -4,63 +4,63 @@ using System.Collections.Generic; // Để dùng List nếu cần
 
 public class SpawnManager : MonoBehaviour
 {
-    [Header("Data & Prefabs")]
-    public HospitalSettingsSO settings;
+    [Header("Vehicle Settings")]
+    public GameObject carPrefab;
+    [Tooltip("Thời gian giữa mỗi lần xuất hiện xe mới (Giây)")]
+    public float carSpawnInterval = 10f;
+    public Transform carSpawnPoint;
+    public Transform[] roadWaypoints;
+    public int dropOffWaypointIndex = 1;
+    public int pickupWaypointIndex = 3;
+
+    [Header("Patient Data (Truyền cho xe)")]
     public GameObject patientPrefab;
-    public Transform spawnPoint;
-    public Transform exitPoint; // Điểm đi về dành cho các NPC
-
-    [Header("Routing Customization")]
-    [Tooltip("Kéo thả Node Waypoint cuối cùng mà NPC bắt buộc phải đi tới trước khi rẽ ra cổng (Exit Point)")]
-    public WaypointNode finalExitNode; 
-
-    [Header("Cấu hình Tốc độ (Thủ công)")]
-    [Tooltip("Thời gian đẻ bệnh nhân (đơn vị: Giây). Ví dụ gõ 5 thì cứ 5 giây đẻ 1 người.")]
-    public float spawnIntervalInSeconds = 5f;
+    public Transform exitPoint;
+    public WaypointNode finalExitNode;
 
     void Start()
     {
-        // Kiểm tra an toàn trước khi chạy
-        if (settings == null)
+        if (carPrefab == null || carSpawnPoint == null)
         {
-            Debug.LogError("SpawnManager: Bạn chưa kéo HospitalSettingsSO vào ô Settings!");
+            Debug.LogError("SpawnManager: Bạn chưa kéo CarPrefab hoặc CarSpawnPoint!");
             return;
         }
 
-        // Bắt đầu vòng lặp đẻ NPC
-        StartCoroutine(SpawnRoutine());
+        StartCoroutine(VehicleSpawnRoutine());
     }
 
-    IEnumerator SpawnRoutine()
+    IEnumerator VehicleSpawnRoutine()
     {
-        // Đợi 0.5 giây để đảm bảo HospitalManager đã Awake xong
-        yield return new WaitForSeconds(0.5f);
+        // Đợi một chút lúc bắt đầu
+        yield return new WaitForSeconds(1f);
 
         while (true)
         {
-            // 1. Spawn NPC
-            SpawnPatient();
-
-            // 2. Nghỉ theo đúng số giây bạn đã nhập trên Inspector
-            yield return new WaitForSeconds(spawnIntervalInSeconds);
+            SpawnVehicle();
+            yield return new WaitForSeconds(carSpawnInterval);
         }
     }
 
-
-    void SpawnPatient()
+    void SpawnVehicle()
     {
-        if (patientPrefab == null || spawnPoint == null) return;
-
-        GameObject newPatient = Instantiate(patientPrefab, spawnPoint.position, spawnPoint.rotation);
+        GameObject newCar = Instantiate(carPrefab, carSpawnPoint.position, carSpawnPoint.rotation);
         
-        // NPC sẽ tự tìm Waypoint gần nhất và di chuyển theo lộ trình đồ thị
-        CharacterNavigator nav = newPatient.GetComponent<CharacterNavigator>();
+        VehicleNavigator nav = newCar.GetComponent<VehicleNavigator>();
         if (nav != null)
         {
-            nav.exitPoint = exitPoint;
+            // Truyền dữ liệu lộ trình cho xe
+            nav.waypoints = roadWaypoints;
+            nav.dropOffIndex = dropOffWaypointIndex;
+            nav.pickupIndex = pickupWaypointIndex;
             
-            // --- TRUYỀN NODE KẾT THÚC CHO NPC ---
-            nav.finalExitNode = finalExitNode; 
+            // Truyền dữ liệu bệnh nhân để xe đẻ ra đúng loại
+            nav.patientPrefab = patientPrefab;
+            nav.patientExitPoint = exitPoint;
+            nav.patientFinalExitNode = finalExitNode;
+        }
+        else
+        {
+            Debug.LogError("SpawnManager: CarPrefab không có component VehicleNavigator!");
         }
     }
 }

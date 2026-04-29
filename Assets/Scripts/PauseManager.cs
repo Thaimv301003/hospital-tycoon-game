@@ -12,11 +12,8 @@ public class PauseManager : MonoBehaviour
 
     private void Start()
     {
-        // Khi bắt đầu game, đảm bảo bảng Pause luôn ẩn
-        if (pauseMenuPanel != null)
-        {
-            pauseMenuPanel.SetActive(false);
-        }
+        // Khi bắt đầu game, TỰ ĐỘNG hiện bảng Pause để người chơi chọn Continue/Restart
+        PauseGame();
     }
 
     /// <summary>
@@ -44,6 +41,12 @@ public class PauseManager : MonoBehaviour
     /// </summary>
     public void ContinueGame()
     {
+        // NẠP DỮ LIỆU CŨ TRƯỚC KHI TIẾP TỤC
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.LoadGame();
+        }
+
         Time.timeScale = 1f; // Tiếp tục thời gian
         if (pauseMenuPanel != null)
         {
@@ -63,6 +66,12 @@ public class PauseManager : MonoBehaviour
     /// </summary>
     public void RestartGame()
     {
+        // XÓA FILE SAVE CŨ ĐỂ BẮT ĐẦU LẠI
+        if (SaveManager.Instance != null)
+        {
+            SaveManager.Instance.DeleteSave();
+        }
+
         // Trả lại thời gian bình thường trước khi load lại cảnh (rất quan trọng)
         Time.timeScale = 1f; 
         

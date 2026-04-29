@@ -5,6 +5,7 @@ using System.Collections.Generic;
 public class RoomController : MonoBehaviour
 {
     [Header("Configurations")]
+    public string roomID; // ID duy nhất để lưu game
     public RoomDataSO roomData;
     public RoomType roomType; 
     public int roomLevel = 1;

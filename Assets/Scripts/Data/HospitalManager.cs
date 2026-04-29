@@ -68,6 +68,22 @@ public class HospitalManager : MonoBehaviour
     {
         UpdateMoneyUI();
         UpdatePatientsUI();
+
+        // Bắt đầu chu kỳ tự động lưu game (mỗi 60 giây)
+        StartCoroutine(AutoSaveRoutine());
+    }
+
+    IEnumerator AutoSaveRoutine()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(60f);
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.SaveGame();
+                Debug.Log("[HospitalManager] Đã tự động lưu game.");
+            }
+        }
     }
 
     // Hàm để các phòng tự thêm mình vào danh sách quản lý
